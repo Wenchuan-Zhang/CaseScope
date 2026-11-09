@@ -1,0 +1,4 @@
+numpy>=1.24
+openai>=1.40            # openai backend
+huggingface_hub>=0.23   # --data <repo id>
+# vllm==0.19.1          # vllm backend and the default A1 judge (install separately, needs a CUDA GPU)
