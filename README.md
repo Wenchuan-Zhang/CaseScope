@@ -213,7 +213,7 @@ If you use CaseScope in your research, please cite our paper:
 @article{zhang2026casescope,
   title   = {{CaseScope}: A Multi-Field Benchmark for Case-Level Pathology Diagnosis with Multimodal {LLMs}},
   author  = {Zhang, Wenchuan and Zhang, Chengyang and Li, Fengling and Yin, Ting and Shu, Chen and Chen, Jie and
-             Zhang, Shuwan and Wu, Xiaoyan and Zhang, Zhang and Yi, Yuhao and Bu, Hong},
+             Zhang, Shuwan and Wu, Xiaoyan and Zhang, Zhang and Yi, Yuhao and Lv, Jiancheng and Bu, Hong},
   journal = {arXiv preprint},
   year    = {2026}
 }
