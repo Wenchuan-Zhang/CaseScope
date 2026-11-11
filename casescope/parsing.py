@@ -45,71 +45,105 @@ FINAL_ANSWER = re.compile(   # explicit answer statements; the option letter mus
     r'|final answer|correct answer|the answer|answer|correct option|best answer|most likely diagnosis|best option)'
     r'\s*(?:是|为|应为|应该是|选|is|would be|will be|:)?\s*[:：]?\s*\**\s*[\(（【\[]?\s*(?:选项\s*|[Oo]ption\s*)?'
     r'(?:(?P<key>(?-i:[A-L]))(?![A-Za-z\-–~～至到])|(?:图像|图片|图|Image\s*|image\s*|Figure\s*)(?P<num>\d))', re.I)
-BOXED = re.compile(r'\\boxed\{\s*\\?(?:text\{)?\s*(?P<key>[A-L])\s*\}?\s*\}')
+ANY_BOX = re.compile(   # boxed final answers: LaTeX \boxed{C} / \boxed{\text{C}} and GLM-4.1V's <|begin_of_box|>C<|end_of_box|>
+    r'\\boxed\{\s*\\?(?:text\{)?\s*(?P<a>[^{}]*?)\s*\}?\s*\}|<\|begin_of_box\|>\s*(?P<b>.*?)\s*<\|end_of_box\|>', re.S)
 
 
 def parse_choice(text, options):
-    """option key the response commits to, or None"""
+    """Option key the response commits to, or None.
+
+    An option letter is read at the start of the response (bare, bracketed, or in markdown emphasis on a line of its
+    own), from a boxed answer (\\boxed{C}, or box tokens such as GLM's), or, in a long response, only from a committed
+    conclusion. An image number is never an option letter by position: where the options are the fields themselves (G1,
+    whose options rotate while the fields keep their numbers) a named field maps to the option that is this field, and in
+    the other tasks a mention of an image is not an answer."""
     keys = [o['key'] for o in options]
     t = strip_reasoning(text)
     if not t:
         return None
+    fields = all(o['zh'].startswith('图') for o in options)   # the options are the fields themselves (G1)
+
+    def field_key(n):   # the option that is field n
+        return next((o['key'] for o in options if o['zh'] == f'图{int(n)}'), None)
+
     t1 = t.strip().strip('*').strip()
-    # 1) a bare letter, or a letter with punctuation, at the start
+    # 1) option letter at the start: bare / bracketed (not the English words 'A', 'I') ...
     m = re.match(r'^[\(\[（【]?\s*([A-L])\s*[\)\]）】]?(?:[\.\s:：、,，]|$)', t1)
-    if m and m.group(1) in keys:
+    if m and m.group(1) in keys and not re.match(r'^[AI]\s+[a-z]', t1):
         return m.group(1)
-    # 2) image-number answers (G1: the options are the fields)
+    # ... or in markdown emphasis, alone on its line ('**B**', '**B**（图4）'): the committed answer, unless the last
+    # line closes with a different emphasised letter ('修正后的答案：**I**'), a self-correction. An emphasised letter that
+    # opens a sentence ('**A)** 10x40 shows ...', '**A**. Inflammatory ... typically shows') is a label, not an answer.
+    m = re.match(r'^\s*(\*\*|__|\*)\s*[\(\[（【]?\s*([A-L])\s*[\)\]）】]?\s*[\.:：、]?\s*\1[ \t]*([^\n]*)', t)
+    if m and m.group(2) in keys and re.fullmatch(r'(?:[\.。:：]?\s*[（(][^（()）]*[）)]\s*[\.。]?)?', m.group(3).strip()):
+        last = [l.strip() for l in t.strip().splitlines() if l.strip()][-1]
+        c = re.search(r'(\*\*|__)\s*[\(（]?([A-L])[\)）]?(?:[\.、:：\s][^*_]*)?\1\s*[。\.]?$', last)
+        return c.group(2) if c and c.group(2) in keys else m.group(2)
+    # 2) the whole answer is a number (图1 / 编号2 / 视野3 / Image 2 / field 2 / 1): the field of that number where the
+    #    options are the fields, otherwise the n-th option (not for an image number: no option is an image there)
     num_prefix = r'(?:图像|图片|图|编号|视野|第|Image\s*|image\s*|Field\s*|field\s*|No\.?\s*|#)'
-    m = re.match(r'^' + num_prefix + r'?\s*(\d)\s*(?:张|个|号)?\s*[。\.]?\s*$', t1)
-    if m and 1 <= int(m.group(1)) <= len(keys):
-        return keys[int(m.group(1)) - 1]
-    m = re.match(r'^' + num_prefix + r'\s*(\d)', t1)
-    if m and 1 <= int(m.group(1)) <= len(keys) and all(o['zh'].startswith('图') for o in options):
-        return keys[int(m.group(1)) - 1]
-    if len(keys) == 2 and all(o['zh'].startswith('图') for o in options):   # two fields: left / right
-        def sides(s):
-            found = re.findall(r'\b(left|right)\s+(?:image|panel|one)', s.lower()) + re.findall(r'(左|右)(?:图|侧|边)', s)
-            return {{'left': 0, '左': 0, 'right': 1, '右': 1}[x] for x in found}
-        lr = sides(t1)
-        if len(lr) > 1:
-            cut = max((t1.lower().rfind(w) for w in ('conclusion', 'final answer', '结论', '答案')), default=-1)
-            lr = sides(t1[cut:]) if cut >= 0 else lr
-        if len(lr) == 1:
-            return keys[lr.pop()]
-    # 2b) long free-form reasoning: only a committed conclusion counts (the last explicit answer statement, a boxed
-    #     letter, or a final line that is an option); otherwise None and the LLM extraction decides (casescope.judge)
-    if unfinished(t1):
+    m = re.match(r'^(' + num_prefix + r')?\s*(\d)\s*(?:张|个|号)?\s*[。\.]?\s*$', t1)
+    if m:
+        if fields:
+            if field_key(m.group(2)):
+                return field_key(m.group(2))
+        elif 1 <= int(m.group(2)) <= len(keys) and not re.match(r'^(?:图像|图片|图|视野|Image|image|Field|field)', m.group(1) or ''):
+            return keys[int(m.group(2)) - 1]
+    if unfinished(t1):   # reasoning cut off before the answer: no answer
         return None
+    # 1b) boxed answers, at any length: the last box that names an option
+    for m in reversed(list(ANY_BOX.finditer(t))):
+        c = (m.group('a') if m.group('a') is not None else m.group('b')).strip().strip('*').strip()
+        mm = re.match(r'^[\(（]?\s*(?:选项\s*|[Oo]ption\s*)?([A-L])\s*[\)）]?(?:[\.\s:：、,，（(]|$)', c)
+        if mm and mm.group(1) in keys:
+            return mm.group(1)
+        mm = re.match(r'^(?:图像|图片|图|Image\s*|image\s*)\s*(\d)$', c)
+        if mm and fields and field_key(mm.group(1)):
+            return field_key(mm.group(1))
+
+    def side():   # two-field items: 'left' / 'right' is field 1 / field 2 (mosaic input), mapped by field
+        if not (fields and len(keys) == 2):
+            return None
+
+        def find(text):
+            found = re.findall(r'\b(left|right)\s+(?:image|panel|one)', text.lower()) + re.findall(r'(左|右)(?:图|侧|边)', text)
+            return {{'left': 1, '左': 1, 'right': 2, '右': 2}[x] for x in found}
+        lr = find(t1)
+        if len(lr) > 1:   # both mentioned while comparing: use the committed conclusion
+            cut = max((t1.lower().rfind(w) for w in ('conclusion', 'final answer', '结论', '答案')), default=-1)
+            lr = find(t1[cut:]) if cut >= 0 else lr
+        return field_key(lr.pop()) if len(lr) == 1 else None
+
+    # 2b) long free-form reasoning: only a committed conclusion counts. The rules below take the first
+    #     match anywhere, which in a long chain of reasoning is an early mention ("five options (A-E)", "Image 1 shows ...",
+    #     "option C is unlikely"), not the answer. So: the last explicit answer statement, or a final line that is an
+    #     option letter; without one, None, and the LLM extraction (casescope.judge) decides.
     if len(t1) > LONG_ANSWER:
-        boxed = [m.group('key') for m in BOXED.finditer(t1) if m.group('key') in keys]
-        if boxed:
-            return boxed[-1]
         for m in reversed(list(FINAL_ANSWER.finditer(t1))):
-            g = m.group('key') or m.group('num')
-            if g and g.isdigit() and 1 <= int(g) <= len(keys):
-                return keys[int(g) - 1]
-            if g in keys:
-                return g
-        last = [line.strip().strip('*#>').strip() for line in t1.splitlines() if line.strip()][-1]
+            if m.group('key'):
+                if m.group('key') in keys:
+                    return m.group('key')
+            elif fields and field_key(m.group('num')):   # "the answer is Image 3": that field
+                return field_key(m.group('num'))
+        last = [l.strip().strip('*#>').strip() for l in t1.splitlines() if l.strip()][-1]   # the last line only
         m = re.match(r'^[\(（]?([A-L])[\)）]?\s*[\.、:：]?\s*\**\s*(.*?)\s*[。\.]?$', last)
         if m and m.group(1) in keys:
             rest = m.group(2).strip('* ')
             opt = next(o for o in options if o['key'] == m.group(1))
             if not rest or any(o_ and rest.lower().startswith(o_.lower()[:12]) for o_ in (opt.get('zh'), opt.get('en'))):
                 return m.group(1)
-        return None
-    # 3) explicit statements
-    for pat in (r'(?:答案|选项|选择|answer is|answer:|Answer:|option)\s*[:：是为]?\s*[\(（]?\s*([A-L])\b',
-                r'\b([A-L])\s*[\.\)）]\s*(?:is|为|是)?', r'(?:图像|图|编号|视野|Image\s*|Figure\s*)(\d)'):
-        m = re.search(pat, t1)
-        if m:
-            g = m.group(1)
-            if g.isdigit() and 1 <= int(g) <= len(keys):
-                return keys[int(g) - 1]
-            if g in keys:
-                return g
-    # 4) an option's text (longest match, unique)
+        return side()
+    # 3) explicit statements (emphasis before the letter allowed); the side on two-field items; 'X.' / 'X)'
+    m = re.search(r'(?:答案|选项|选择|answer is|answer:|Answer:|option)\s*[:：是为]?\s*\**\s*[\(（]?\s*([A-L])\b', t1)
+    if m and m.group(1) in keys:
+        return m.group(1)
+    s = side()
+    if s:
+        return s
+    m = re.search(r'\b([A-L])\s*[\.\)）]\s*(?:is|为|是)?', t1)
+    if m and m.group(1) in keys:
+        return m.group(1)
+    # 4) option text mentioned (longest match wins, must be unique); on G1 this is a single named field
     hits = []
     for o in options:
         for lang in ('zh', 'en'):
@@ -119,7 +153,7 @@ def parse_choice(text, options):
         hits.sort(reverse=True)
         if len(hits) == 1 or hits[0][0] > hits[1][0] or hits[0][1] == hits[1][1]:
             return hits[0][1]
-    # 5) a single standalone capital letter
+    # 5) a single standalone capital letter anywhere
     found = set(re.findall(r'(?<![A-Za-z])([A-L])(?![A-Za-z])', t1)) & set(keys)
     if len(found) == 1:
         return found.pop()

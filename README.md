@@ -17,7 +17,7 @@
 
 Pathologists rarely diagnose from a single image: they scan a section at low power for architecture, zoom into selected
 fields for cytology, and integrate the evidence across views and scales. CaseScope evaluates multimodal large language
-models (MLLMs) on exactly this setting: **diagnosis of a case from several curated H&E fields of one lesion**, ordered from
+models (MLLMs) on exactly this setting: **diagnosis of a case from several curated H&E fields of one lesion** (for atlas figure series, of one disease), ordered from
 low to high magnification. It consists of **1,236 cases** with **4,941 fields**, covering **843 diagnostic entities**
 across **18 organ systems**, and poses **4,679 items** in **six tasks**:
 
@@ -35,7 +35,7 @@ across **18 organ systems**, and poses **4,679 items** in **six tasks**:
 | **B** | Behaviour triage: non-neoplastic, benign, intermediate, malignant | 380 | 762 | CircularEval, critical miss rate |
 | **C** | Ordinal grading (e.g. DCIS nuclear grade, Gleason pattern, endometrial dating) | 44 | - | CircularEval, quadratic weighted kappa |
 | **R1** | Finding verification: four true/false statements on low-power architecture or high-power cytology | 390 | 195 | statement and item accuracy |
-| **G1** | Finding location: which field shows a described finding | - | 436 | CircularEval over the field orders |
+| **G1** | Finding location: which field shows a described finding | - | 436 | CircularEval over the option rotations |
 
 ## Benchmark Construction
 
@@ -95,9 +95,9 @@ model per column in bold). <sup>†</sup>Single-image model given a numbered mos
 | Model | Teaching A1 | A2 | B | C | R1 | Atlas A1 | A2 | B | R1 | G1 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | *Proprietary MLLMs* | | | | | | | | | | |
-| Claude Sonnet 5.5 | **64.2** | 42.0 | **60.3** | **72.7** | **93.2** | **41.6** | 25.9 | 42.8 | **80.8** | **54.8** |
-| Claude Haiku 5.5 | 43.9 | 38.8 | 55.0 | 52.3 | 83.2 | 28.8 | 29.5 | **44.1** | 73.6 | 47.9 |
-| GPT-5.6-sol | 43.5 | **49.3** | 55.5 | 61.4 | 92.9 | 27.6 | **37.1** | 41.9 | 78.6 | 45.6 |
+| Claude Sonnet 5.5 | **64.2** | **61.7** | **75.5** | **79.5** | **93.2** | **41.6** | **49.1** | **61.5** | **80.8** | **61.5** |
+| Claude Haiku 5.5 | 43.9 | 39.0 | 57.4 | 54.5 | 83.2 | 28.8 | 29.9 | 47.0 | 73.6 | 48.2 |
+| GPT-5.6-sol | 43.5 | 49.3 | 55.5 | 61.4 | 92.9 | 27.6 | 37.1 | 41.9 | 78.6 | 45.6 |
 | GPT-5.6-luna | 33.5 | 31.9 | 51.1 | 56.8 | 87.1 | 19.8 | 24.1 | 32.7 | 73.1 | 39.9 |
 | *General MLLMs (open)* | | | | | | | | | | |
 | Qwen2.5-VL-7B | 11.7 | 6.0 | 18.7 | 9.1 | 63.0 | 10.9 | 9.8 | 17.2 | 63.6 | 39.4 |
@@ -105,15 +105,15 @@ model per column in bold). <sup>†</sup>Single-image model given a numbered mos
 | Qwen3-VL-8B | 11.9 | 10.6 | 30.5 | 27.3 | 63.3 | 12.3 | 12.1 | 17.1 | 64.6 | 32.8 |
 | Qwen3.5-9B | 29.7 | **17.9** | 31.8 | **36.4** | **81.5** | 18.6 | **14.2** | 28.1 | **69.5** | **42.7** |
 | MiMo-VL-7B | 15.9 | 7.8 | 26.8 | 29.5 | 66.1 | 12.2 | 8.9 | 23.6 | 67.3 | 33.5 |
-| GLM-4.1V-9B-Thinking | 19.4 | 8.9 | 30.0 | 29.5 | 74.7 | 15.4 | 9.5 | 29.0 | 68.3 | 22.9 |
+| GLM-4.1V-9B-Thinking | 19.4 | 12.6 | 31.1 | 29.5 | 74.7 | 15.4 | 12.6 | 31.6 | 68.3 | 36.2 |
 | *Medical MLLMs* | | | | | | | | | | |
 | HuatuoGPT-Vision-7B (Q2.5-VL) | 12.0 | 8.0 | 30.8 | 13.6 | 57.8 | 11.8 | 9.4 | 24.7 | 64.9 | 31.7 |
 | Lingshu-7B | 21.0 | 5.7 | 34.2 | **36.4** | 57.8 | 14.8 | 7.0 | **32.3** | 61.3 | 39.4 |
-| OctoMed-7B | 14.1 | 4.8 | 12.9 | 20.5 | 62.2 | 8.4 | 4.6 | 15.1 | 60.4 | 22.5 |
-| MedGemma-1.5-4B | 11.5 | 2.5 | 18.7 | 20.5 | 51.7 | 5.9 | 1.6 | 17.5 | 57.8 | 11.0 |
+| OctoMed-7B | 14.1 | 4.8 | 12.9 | 20.5 | 62.2 | 8.4 | 4.8 | 15.1 | 60.4 | 22.5 |
+| MedGemma-1.5-4B | 11.5 | 2.5 | 18.9 | 20.5 | 51.7 | 5.9 | 1.8 | 17.7 | 57.8 | 11.0 |
 | Hulu-Med-7B | 17.3 | 13.3 | 33.4 | 13.6 | 63.3 | 9.6 | 4.8 | 20.7 | 63.2 | 21.6 |
 | *Pathology MLLMs* | | | | | | | | | | |
-| Quilt-LLaVA-7B<sup>†</sup> | 3.8 | 1.6 | 1.1 | 2.3 | 49.4 | 2.0 | 0.8 | 10.6 | 46.4 | 15.1 |
+| Quilt-LLaVA-7B<sup>†</sup> | 3.8 | 1.6 | 1.1 | 2.3 | 49.4 | 2.0 | 0.6 | 10.6 | 46.4 | 15.1 |
 | PathGen-LLaVA-13B<sup>†</sup> | 17.4 | 4.4 | 13.9 | 4.5 | 50.1 | 8.5 | 1.9 | 22.8 | 49.7 | 16.1 |
 | CLOVER | 12.5 | 4.1 | 20.5 | **36.4** | 59.9 | 11.6 | 7.2 | 14.2 | 63.6 | 16.1 |
 | Patho-R1-3B | 13.4 | 0.2 | 2.4 | 6.8 | 12.1 | 14.3 | 0.1 | 3.1 | 14.4 | 2.1 |
