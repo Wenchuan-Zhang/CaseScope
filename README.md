@@ -1,6 +1,7 @@
 <h1 align="center">CaseScope: A Multi-Field Benchmark for Case-Level Pathology Diagnosis with Multimodal LLMs</h1>
 
 <div align="center">
+<a href="https://arxiv.org/abs/2611.15325"><img src="https://img.shields.io/badge/arXiv-2611.15325-b31b1b.svg" alt="arXiv"></a>
 <a href="https://github.com/Wenchuan-Zhang/CaseScope/blob/main/LICENSE"><img src="https://img.shields.io/badge/Code_License-MIT-blue" alt="code license"></a>
 <a href="https://creativecommons.org/licenses/by-nc/4.0/"><img src="https://img.shields.io/badge/Data_License-CC_BY--NC_4.0-lightgrey" alt="data license"></a>
 <a href="https://huggingface.co/datasets/WenchuanZhang/CaseScope"><img alt="Dataset" src="https://img.shields.io/badge/🤗%20Dataset-orange?color=FF6F00"></a>
@@ -9,6 +10,7 @@
 <h5 align="center"> If you like our project, please give us a star ⭐ on GitHub for the latest update.</h5>
 
 # ✨ News
++ [Nov 2026] 📄 The paper is on [arXiv](https://arxiv.org/abs/2611.15325).
 + [Nov 2026] 🚀 **CaseScope released**: the benchmark data on [Hugging Face](https://huggingface.co/datasets/WenchuanZhang/CaseScope) and the evaluation code in this repository.
 
 ## 📖 Overview
@@ -214,7 +216,7 @@ If you use CaseScope in your research, please cite our paper:
   title   = {{CaseScope}: A Multi-Field Benchmark for Case-Level Pathology Diagnosis with Multimodal {LLMs}},
   author  = {Zhang, Wenchuan and Zhang, Chengyang and Li, Fengling and Yin, Ting and Shu, Chen and Chen, Jie and
              Zhang, Shuwan and Wu, Xiaoyan and Zhang, Zhang and Yi, Yuhao and Lv, Jiancheng and Bu, Hong},
-  journal = {arXiv preprint},
+  journal = {arXiv preprint arXiv:2611.15325},
   year    = {2026}
 }
 ```
